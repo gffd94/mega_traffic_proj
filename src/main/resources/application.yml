@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: mega-order
+  config:
+    # compose.yaml과 같은 .env 값을 사용 (프로젝트 루트에서 실행 기준)
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:mysql://localhost:3307/${MYSQL_DATABASE}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: ${MYSQL_ROOT_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}

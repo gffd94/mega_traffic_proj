@@ -36,14 +36,32 @@
 
 | 분류 | 기술 |
 |---|---|
-| Language / Framework | Java 17, Spring Boot 3.x, Spring Data JPA |
-| Database | MySQL 8 (Docker Compose) |
-| Cache | Redis (상품 정보 캐시) — 동시성 비교 실험 시 Redisson 분산 락 |
-| Message Queue | RabbitMQ (Saga 이벤트, 재시도, DLQ) |
+| Language / Framework | Java 21, Spring Boot 3.5.16, Spring Data JPA, Validation, Lombok |
+| Build | Gradle 9.7.1 (Gradle Wrapper) |
+| Database | MySQL 8.4 (Docker Compose) |
+| Cache | Redis 7.4 (상품 정보 캐시) — 동시성 비교 실험 시 Redisson 분산 락 |
+| Message Queue | RabbitMQ 4.0 (Saga 이벤트, 재시도, DLQ) |
 | Load Test | k6 |
 | 실행 환경 | 로컬 Docker Compose (MySQL, Redis, RabbitMQ) |
 
 **범위 제외 (2주 이후 확장)**: Nginx/ALB, AWS 배포, Prometheus/Grafana, nGrinder/JMeter
+
+### 2.1 로컬 실행
+
+```bash
+cp .env.example .env    # 값 채우기 (compose.yaml과 application.yml이 함께 사용)
+docker compose up -d    # MySQL, Redis, RabbitMQ 실행
+./gradlew bootRun       # 반드시 프로젝트 루트에서 실행 (.env 경로 기준)
+```
+
+| 서비스 | 호스트 포트 | 비고 |
+|---|---|---|
+| MySQL | 3307 | DB `mega_order`, utf8mb4, Asia/Seoul |
+| Redis | 6379 | AOF 활성화 |
+| RabbitMQ | 5672 / 15672 | AMQP / 관리 UI (http://localhost:15672) |
+
+- `.env`는 git에 올리지 않는다. 키 목록은 `.env.example` 참고.
+- 데이터는 Docker volume에 유지된다. 초기화하려면 `docker compose down -v`.
 
 ---
 
@@ -111,6 +129,7 @@ Table users {
   name varchar(50) [not null]
   point_balance decimal(12,2) [not null, default: 0]
   created_at datetime [not null]
+  updated_at datetime [not null]
 }
 
 Table products {
@@ -183,6 +202,8 @@ Ref: payments.order_id - orders.id
 - `orders.idempotency_key` unique: API 중복 요청 방어
 - `processed_events (consumer, event_id)` unique: 컨슈머 중복 처리 방어. **같은 이벤트를 여러 컨슈머가 받을 수 있으므로** `event_id` 단독이 아니라 컨슈머 이름과 묶는다
 - `order_items.unit_price`: 주문 이후 상품 가격이 바뀌어도 주문 금액이 흔들리지 않도록 스냅샷
+- `created_at` / `updated_at`: `BaseTimeEntity`(JPA Auditing)를 상속한 엔티티는 자동으로 기록된다
+- `users.point_balance` 기본값 0은 엔티티(Builder)에서 채운다. DDL에는 `DEFAULT 0`이 없으므로 SQL 직접 INSERT 시 값을 명시한다
 
 ---
 
@@ -354,7 +375,8 @@ graph TB
 com.mega.order
  ┣ MegaApplication.java
  ┣ global
- ┃  ┣ config          // Redis, RabbitMQ(Exchange/Queue/DLQ), JPA
+ ┃  ┣ BaseTimeEntity.java  // createdAt / updatedAt 자동 관리 (JPA Auditing)
+ ┃  ┣ config          // Redis, RabbitMQ(Exchange/Queue/DLQ), JPA(JpaConfig: @EnableJpaAuditing)
  ┃  ┣ exception       // 전역 예외 처리
  ┃  ┣ outbox          // OutboxEvent 엔티티, 저장 헬퍼, Relay 스케줄러
  ┃  ┗ idempotency     // ProcessedEvent 엔티티, 중복 체크 헬퍼
