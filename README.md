@@ -138,6 +138,7 @@ Table products {
   price decimal(12,2) [not null]
   stock_quantity int [not null]
   created_at datetime [not null]
+  updated_at datetime [not null]
 }
 
 Table orders {
@@ -178,6 +179,10 @@ Table outbox_events {
   status varchar(20) [not null]            // READY, PUBLISHED
   created_at datetime [not null]
   published_at datetime
+
+  indexes {
+    (status, created_at) [name: 'idx_outbox_status_created']  // Relay의 READY 이벤트 조회용
+  }
 }
 
 Table processed_events {
