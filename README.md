@@ -69,6 +69,7 @@ docker compose up -d    # MySQL, Redis, RabbitMQ 실행
 
 | 기능 | Method | Endpoint | 설명 |
 |---|---|---|---|
+| 테스트 데이터 | POST | `/api/v1/users` | 테스트용 유저 등록 |
 | 테스트 데이터 | POST | `/api/v1/users/{userId}/points` | 포인트 충전 |
 | 테스트 데이터 | POST | `/api/v1/products` | 상품 및 초기 재고 등록 |
 | 포인트 조회 | GET | `/api/v1/users/{userId}/points` | 테스트 결과 검증용 잔액 조회 |

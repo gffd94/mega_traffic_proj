@@ -31,8 +31,29 @@ public class User extends BaseTimeEntity {
 
 	@Builder
 	private User(String name, BigDecimal pointBalance) {
+		validateName(name);
+		validatePointBalance(pointBalance);
 		this.name = name;
 		this.pointBalance = pointBalance != null ? pointBalance : BigDecimal.ZERO;
+	}
+
+	public void chargePoint(BigDecimal amount) {
+		if (amount == null || amount.signum() <= 0) {
+			throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다. 입력 금액: " + amount);
+		}
+		this.pointBalance = this.pointBalance.add(amount);
+	}
+
+	private void validateName(String name) {
+		if (name == null || name.isBlank()) {
+			throw new IllegalArgumentException("회원 이름은 필수입니다.");
+		}
+	}
+
+	private void validatePointBalance(BigDecimal pointBalance) {
+		if (pointBalance != null && pointBalance.signum() < 0) {
+			throw new IllegalArgumentException("포인트 잔액은 0 이상이어야 합니다. 입력 잔액: " + pointBalance);
+		}
 	}
 
 }
