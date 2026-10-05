@@ -208,6 +208,7 @@ Ref: payments.order_id - orders.id
 - `orders.idempotency_key` unique: API 중복 요청 방어
 - `processed_events (consumer, event_id)` unique: 컨슈머 중복 처리 방어. **같은 이벤트를 여러 컨슈머가 받을 수 있으므로** `event_id` 단독이 아니라 컨슈머 이름과 묶는다
 - `order_items.unit_price`: 주문 이후 상품 가격이 바뀌어도 주문 금액이 흔들리지 않도록 스냅샷
+- `orders.user_id`, `order_items.product_id`, `payments.order_id`는 도메인 간 결합을 낮추기 위해 ID만 저장하고 물리 FK를 두지 않는다. `order_items.order_id`만 실제 FK
 - `created_at` / `updated_at`: `BaseTimeEntity`(JPA Auditing)를 상속한 엔티티는 자동으로 기록된다
 - `users.point_balance` 기본값 0은 엔티티(Builder)에서 채운다. DDL에는 `DEFAULT 0`이 없으므로 SQL 직접 INSERT 시 값을 명시한다
 
@@ -221,11 +222,13 @@ Ref: payments.order_id - orders.id
 |---|---|---|---|---|---|
 | 1. 주문 생성 | order | 주문 `PENDING` 저장 | `OrderCreated` | - | - |
 | 2. 재고 예약 | product | 주문 상품 전체 재고 차감 | `StockReserved` | `StockReserveFailed` | 없음 (한 트랜잭션에서 전부 롤백) |
+| 2-1. 예약 반영 | order | `StockReserved` 구독 → 주문 `STOCK_RESERVED` | - | - | - |
 | 3. 포인트 결제 | payment | 포인트 차감 + 결제 기록 | `PaymentCompleted` | `PaymentFailed` | **재고 복구** |
-| 4. 주문 확정 | order | 주문 `COMPLETED` | - | - | - |
+| 4. 주문 확정 | order | 주문 `COMPLETED` (`PENDING` 또는 `STOCK_RESERVED`에서) | - | - | - |
 
 - 2단계는 이미 커밋된 상태에서 3단계가 실패할 수 있다. 이때 **재고 복구가 보상 트랜잭션**이 된다.
-- 재고 복구 수량은 `order_items`를 기준으로 계산한다.
+- 재고 복구 수량은 이벤트 payload에 담긴 상품 ID와 수량 목록을 기준으로 한다. product 도메인이 order 테이블을 직접 조회하지 않기 위함이다.
+- 주문 확정은 `PENDING` 또는 `STOCK_RESERVED` 상태에서 가능하다. 메시지 도착 순서가 보장되지 않아 `PaymentCompleted`가 `StockReserved`보다 먼저 도착할 수 있기 때문이다.
 
 ### 5.2 성공 흐름
 
@@ -247,9 +250,14 @@ sequenceDiagram
     Stock->>Stock: [TX] processed_events + 재고 차감 + Outbox(StockReserved)
     Stock->>MQ: StockReserved
 
-    MQ->>Pay: StockReserved
-    Pay->>Pay: [TX] processed_events + 포인트 차감 + 결제 SUCCESS + Outbox(PaymentCompleted)
-    Pay->>MQ: PaymentCompleted
+    par 포인트 결제
+        MQ->>Pay: StockReserved
+        Pay->>Pay: [TX] processed_events + 포인트 차감 + 결제 SUCCESS + Outbox(PaymentCompleted)
+        Pay->>MQ: PaymentCompleted
+    and 주문 상태 갱신
+        MQ->>Order: StockReserved
+        Order->>Order: [TX] processed_events + 주문 STOCK_RESERVED
+    end
 
     MQ->>Order: PaymentCompleted
     Order->>Order: [TX] processed_events + 주문 COMPLETED
@@ -390,7 +398,7 @@ com.mega.order
  ┣ product            // 상품, 재고 예약/복구
  ┃  ┗ messaging       // OrderCreated, PaymentFailed 컨슈머
  ┣ order              // 주문 접수, 상태 조회, 확정/취소
- ┃  ┗ messaging       // PaymentCompleted, PaymentFailed, StockReserveFailed 컨슈머
+ ┃  ┗ messaging       // StockReserved, PaymentCompleted, PaymentFailed, StockReserveFailed 컨슈머
  ┗ payment            // 포인트 차감, 결제 기록
     ┗ messaging       // StockReserved 컨슈머
 ```
