@@ -35,6 +35,9 @@ public class Product extends BaseTimeEntity {
 
 	@Builder
 	private Product(String name, BigDecimal price, int stockQuantity) {
+		validateName(name);
+		validatePrice(price);
+		validateStockQuantity(stockQuantity);
 		this.name = name;
 		this.price = price;
 		this.stockQuantity = stockQuantity;
@@ -51,6 +54,24 @@ public class Product extends BaseTimeEntity {
 	public void increaseStock(int quantity) {
 		validateQuantity(quantity);
 		this.stockQuantity += quantity;
+	}
+
+	private void validateName(String name) {
+		if (name == null || name.isBlank()) {
+			throw new IllegalArgumentException("상품명은 필수입니다.");
+		}
+	}
+
+	private void validatePrice(BigDecimal price) {
+		if (price == null || price.signum() <= 0) {
+			throw new IllegalArgumentException("가격은 0보다 커야 합니다. 입력 가격: " + price);
+		}
+	}
+
+	private void validateStockQuantity(int stockQuantity) {
+		if (stockQuantity < 0) {
+			throw new IllegalArgumentException("재고 수량은 0 이상이어야 합니다. 입력 수량: " + stockQuantity);
+		}
 	}
 
 	private void validateQuantity(int quantity) {
