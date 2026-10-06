@@ -27,6 +27,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	// 3.x 마지막 버전. 4.x는 Spring Boot 4 / Netty 4.2 기준이라 Boot 3.5(Netty 4.1)와 맞지 않는다.
+	implementation 'org.redisson:redisson-spring-boot-starter:3.52.0'
 	implementation 'org.springframework.boot:spring-boot-starter-amqp'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	compileOnly 'org.projectlombok:lombok'
