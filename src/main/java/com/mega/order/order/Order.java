@@ -21,6 +21,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order extends BaseTimeEntity {
 
+	// total_price 컬럼 decimal(12,2)의 최대값
+	private static final BigDecimal MAX_TOTAL_PRICE = new BigDecimal("9999999999.99");
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
@@ -44,6 +47,7 @@ public class Order extends BaseTimeEntity {
 
 	@Builder
 	private Order(Long userId, String idempotencyKey, BigDecimal totalPrice) {
+		validateTotalPrice(totalPrice);
 		this.userId = userId;
 		this.idempotencyKey = idempotencyKey;
 		this.totalPrice = totalPrice;
@@ -74,6 +78,15 @@ public class Order extends BaseTimeEntity {
 		}
 		this.status = OrderStatus.CANCELED;
 		this.cancelReason = reason;
+	}
+
+	private void validateTotalPrice(BigDecimal totalPrice) {
+		if (totalPrice == null || totalPrice.signum() <= 0) {
+			throw new IllegalArgumentException("주문 총액은 0보다 커야 합니다. 입력 총액: " + totalPrice);
+		}
+		if (totalPrice.compareTo(MAX_TOTAL_PRICE) > 0) {
+			throw new IllegalArgumentException("주문 총액은 " + MAX_TOTAL_PRICE + "을 넘을 수 없습니다. 입력 총액: " + totalPrice);
+		}
 	}
 
 }
