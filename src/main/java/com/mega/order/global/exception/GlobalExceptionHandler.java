@@ -26,6 +26,16 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(e.getMessage()));
 	}
 
+	@ExceptionHandler(InsufficientStockException.class)
+	public ResponseEntity<ErrorResponse> handleInsufficientStock(InsufficientStockException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(e.getMessage()));
+	}
+
+	@ExceptionHandler(StockDeductionConflictException.class)
+	public ResponseEntity<ErrorResponse> handleStockDeductionConflict(StockDeductionConflictException e) {
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ErrorResponse(e.getMessage()));
+	}
+
 	@ExceptionHandler(MissingRequestHeaderException.class)
 	public ResponseEntity<ErrorResponse> handleMissingRequestHeader(MissingRequestHeaderException e) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
