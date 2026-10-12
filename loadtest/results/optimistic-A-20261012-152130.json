@@ -1,0 +1,32 @@
+{
+  "strategy": "optimistic",
+  "scenario": "A",
+  "scenarioDescription": "한정 수량 쟁탈: 재고 100, VU 200명이 각 1회 요청",
+  "baseUrl": "http://localhost:8080",
+  "finishedAt": "2026-10-12T06:21:30.129Z",
+  "productId": 74,
+  "initialStock": 100,
+  "responses": {
+    "total": 200,
+    "success": 70,
+    "outOfStock409": 0,
+    "conflict503": 130,
+    "other": 0,
+    "otherConnectionError": 0
+  },
+  "remainingStock": 30,
+  "expectedRemainingStock": 30,
+  "checks": {
+    "stockMatchesSuccess": true,
+    "stockNotNegative": true,
+    "passed": true
+  },
+  "latencyMs": {
+    "avg": 755.19,
+    "p95": 991.01,
+    "p99": 1001.25,
+    "max": 1006.28
+  },
+  "deductPhaseSeconds": 1.03,
+  "rps": 193.99
+}

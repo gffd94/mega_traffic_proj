@@ -1,3 +1,9 @@
+server:
+  tomcat:
+    # k6 시나리오 A처럼 연결 200개가 한꺼번에 들어오면 기본 대기열(100)이 넘쳐 연결이 거부될 수 있다
+    # (Windows는 대기열이 넘치면 연결을 즉시 거부). 부하 테스트 측정 조건을 재현할 수 있도록 늘려 둔다.
+    accept-count: 1000
+
 spring:
   application:
     name: mega-order

@@ -1,0 +1,32 @@
+{
+  "strategy": "optimistic",
+  "scenario": "B",
+  "scenarioDescription": "지속 부하: 재고 100000, VU 100명이 30초 동안 계속 요청",
+  "baseUrl": "http://localhost:8080",
+  "finishedAt": "2026-10-12T06:19:14.003Z",
+  "productId": 65,
+  "initialStock": 100000,
+  "responses": {
+    "total": 5253,
+    "success": 1839,
+    "outOfStock409": 0,
+    "conflict503": 3414,
+    "other": 0,
+    "otherConnectionError": 0
+  },
+  "remainingStock": 98161,
+  "expectedRemainingStock": 98161,
+  "checks": {
+    "stockMatchesSuccess": true,
+    "stockNotNegative": true,
+    "passed": true
+  },
+  "latencyMs": {
+    "avg": 574.43,
+    "p95": 799.72,
+    "p99": 898.22,
+    "max": 1088.28
+  },
+  "deductPhaseSeconds": 30.36,
+  "rps": 173.05
+}
