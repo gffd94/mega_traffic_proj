@@ -464,7 +464,7 @@ com.mega.order
 
 ## 10. 트러블슈팅
 
-### 10.1 부하 테스트 중 연결 거부
+### 10.1 부하 테스트 중 연결 거부 [실제 발생]
 
 - **증상**
   - k6로 연결 200개를 동시에 열면(재고 차감 시나리오 A), 일부 요청이 서버에 닿지 못했다.
@@ -481,3 +481,105 @@ com.mega.order
 - **배운 점**
   - 트래픽이 몰리면 비즈니스 로직보다 **연결을 받는 단계가 먼저 막힐 수 있다.**
   - 부하 테스트에서는 응답 코드뿐 아니라 "요청이 서버에 닿았는지"도 따로 세어야 결과를 믿을 수 있다.
+
+### 10.2 Enum을 STRING으로 저장했는데 MySQL 전용 enum 컬럼이 생성됨 [실제 발생]
+
+- **증상**
+  - `@Enumerated(EnumType.STRING)`을 붙였는데도 `ddl-auto`가 `status` 컬럼을 `varchar`가 아닌 `enum('PENDING', ...)` 타입으로 만들었다.
+  - 이 타입은 허용 값 목록이 컬럼 정의에 들어가므로, Java enum에 값을 추가할 때마다 `ALTER TABLE`이 필요해진다.
+- **원인**
+  - Hibernate 6의 `MySQLDialect`는 STRING enum을 MySQL 전용 `enum` 타입으로 선언한다.
+- **조치**
+  - enum 필드마다 `@Column(columnDefinition = "varchar(20)")`처럼 타입을 직접 고정했다. (`orders.status`, `orders.cancel_reason`, `payments.status`, `outbox_events.status`, `outbox_events.aggregate_type`)
+- **배운 점**
+  - ORDINAL을 피한 이유(순서가 바뀌면 기존 데이터의 의미가 바뀜)와 같은 문제가 DB 쪽에서 모양만 바꿔 반복될 수 있다. 저장 방식을 정했다면 실제로 만들어진 컬럼 타입까지 확인해야 한다.
+
+### 10.3 금액 초과 예외가 중복 주문으로 오인됨 [실제 발생]
+
+- **증상**
+  - 수량에 상한이 없어서, 비싼 상품을 많이 담으면 총액이 `total_price decimal(12,2)`의 범위를 넘었다.
+  - 이때 INSERT에서 난 DB 예외(`DataIntegrityViolationException`)를 `OrderFacade`가 Idempotency-Key 중복으로 보고 기존 주문을 다시 조회했다. 조회 결과가 없으니 원래 예외를 다시 던졌고, 처리하는 핸들러가 없어 500이 됐다.
+- **원인**
+  - `OrderFacade`는 같은 키의 동시 요청을 처리하려고 `DataIntegrityViolationException`을 잡는다. 그런데 이 예외는 unique 위반뿐 아니라 값 범위 초과 같은 다른 제약 위반에도 쓰인다.
+- **조치**
+  - `Order` 생성자에서 총액이 0보다 크고 `9999999999.99` 이하인지 검증한다. INSERT 전에 `IllegalArgumentException`이 나서 400으로 응답한다.
+- **배운 점**
+  - 예외를 넓게 잡으면, 다른 원인의 예외가 엉뚱한 처리 경로로 들어간다.
+
+### 10.4 조건부 UPDATE가 updated_at을 갱신하지 않음 [실제 발생]
+
+- **증상**
+  - 조건부 UPDATE로 재고를 차감해도 `products.updated_at`이 바뀌지 않았다.
+- **원인**
+  - `@Query`로 작성한 벌크 UPDATE는 엔티티를 거치지 않고 SQL로 바로 실행된다. 그래서 `updatedAt`을 채우는 JPA Auditing(`@LastModifiedDate`)이 동작하지 않는다.
+- **조치**
+  - 쿼리에 `updatedAt = CURRENT_TIMESTAMP`를 직접 넣었다. 재고 차감(`ProductRepository.decreaseStockIfEnough`)에서 고쳤고, 나중에 만든 포인트 차감(`UserRepository.decreasePointIfEnough`)은 처음부터 같은 방식으로 썼다.
+- **배운 점**
+  - 자동으로 채워지는 값은 엔티티를 거칠 때만 채워진다. 벌크 UPDATE를 쓰면 Auditing 같은 엔티티 기반 기능이 빠진다는 것을 같이 챙겨야 한다.
+
+### 10.5 RabbitMQ exchange와 큐가 생성되지 않음 [실제 발생]
+
+- **증상**
+  - Exchange·Queue·Binding을 빈으로 선언하고 앱을 띄웠지만, RabbitMQ에 아무것도 생기지 않았다. RabbitMQ에 붙은 연결도 0개였다.
+- **원인**
+  - Spring(`RabbitAdmin`)은 RabbitMQ에 **처음 연결될 때** 선언을 실행한다.
+  - 당시에는 컨슈머가 없었고, Relay도 보낼 이벤트가 없으면 연결하지 않아서 연결 자체가 없었다.
+- **조치**
+  - 당시: 앱이 뜰 때 `AmqpAdmin.initialize()`를 호출해 바로 선언하도록 했다. RabbitMQ가 꺼져 있으면 경고만 남기고 기동은 계속하게 했다.
+  - 이후: 컨슈머(`@RabbitListener`)를 추가하자 컨슈머가 앱 기동 시점에 연결을 맺으면서 선언이 자동으로 실행됐다. 그래서 위 코드는 지웠다. 빈 vhost에 앱을 띄워 exchange, 큐 4개, 바인딩 4개가 그대로 생기는 것을 확인했다.
+- **배운 점**
+  - 선언 코드가 있어도 언제 실행되는지는 따로 확인해야 한다. 우회 코드는 그 코드가 필요했던 조건이 사라지면 같이 지운다.
+
+### 10.6 Outbox payload의 금액이 double로 바뀜 [실제 발생]
+
+- **증상**
+  - 총액이 `6001.00`인 주문의 `OrderCreated` 메시지에 `"totalPrice": 6001.0`이 담겨 전송됐다.
+- **원인**
+  - `outbox_events.payload`가 `json` 타입이었다. MySQL은 JSON을 저장할 때 소수가 있는 숫자를 double로 바꿔 저장한다. 키 순서와 공백도 MySQL 기준으로 다시 정리된다.
+- **조치**
+  - 컬럼 타입을 `text`로 바꿔 직렬화한 문자열을 그대로 저장한다.
+  - `ddl-auto: update`는 기존 컬럼의 타입을 바꾸지 않는다. 그래서 엔티티의 `columnDefinition`을 고치고, 기존 테이블은 `ALTER TABLE outbox_events MODIFY payload TEXT NOT NULL`로 직접 바꿨다.
+  - 바꾼 뒤에는 `"totalPrice":8469.40`처럼 소수점 자리까지 그대로 전송되는 것을 확인했다.
+- **배운 점**
+  - 코드에서 금액을 BigDecimal로 다뤄도, 저장하거나 전송하는 경로 중 한 곳에서 double을 거칠 수 있다.
+
+### 10.7 메시지 전송 실패를 성공으로 착각할 수 있음 [설계 중 예방]
+
+- **증상 (예상)**
+  - Relay가 전송에 성공했다고 보고 `PUBLISHED`로 바꿨지만, 실제로는 어느 큐에도 메시지가 없을 수 있다. 그 이벤트는 다시 전송되지 않고 사라진다.
+- **원인**
+  - `RabbitTemplate.send()`는 메시지를 내보내기만 하고 결과를 기다리지 않는다. 브로커가 받지 못했거나, 연결된 큐가 없어 메시지가 버려져도 호출은 정상으로 끝난다.
+- **조치**
+  - publisher confirm(`publisher-confirm-type: correlated`)으로 브로커가 받았는지 확인한다.
+  - mandatory(`template.mandatory: true`, `publisher-returns: true`)로 큐까지 전달됐는지 확인한다.
+  - Relay는 수신 확인(ack)을 최대 5초 기다리고, 큐로 가지 못해 되돌아온 메시지가 없을 때만 `PUBLISHED`로 바꾼다. 그 밖의 경우는 `READY`로 두고 다음 주기에 다시 보낸다.
+- **배운 점**
+  - 메시지를 "보냈다"와 "브로커가 받아 큐에 넣었다"는 다르다. Outbox의 유실 방지는 이 둘을 구분해야 성립한다.
+
+### 10.8 서로 다른 이벤트가 주문 상태를 덮어쓸 수 있음 [설계 중 예방]
+
+- **증상 (예상)**
+  - 결제까지 끝난 주문이 `COMPLETED`가 아니라 `STOCK_RESERVED`로 남을 수 있다.
+- **원인**
+  - `StockReserved`와 `PaymentCompleted`는 서로 다른 큐로 와서 서로 다른 스레드가 처리한다.
+  - 두 스레드가 같은 주문을 동시에 `PENDING`으로 읽으면, 한쪽이 `COMPLETED`로 바꾼 것을 다른 쪽이 `STOCK_RESERVED`로 덮어쓸 수 있다 (Lost Update).
+- **조치**
+  - 주문 상태를 바꾸기 전에 `OrderRepository.findByIdForUpdate`(`@Lock(PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`)로 주문 행을 잠근다. 뒤에 온 스레드는 앞 트랜잭션이 커밋될 때까지 기다렸다가 바뀐 상태를 읽는다.
+  - 이미 `COMPLETED`나 `CANCELED`인 주문에 `StockReserved`가 오면 순서가 바뀐 것으로 보고, 반영하지 않고 정상 처리한다.
+- **배운 점**
+  - 재고는 조건부 UPDATE, 주문 상태는 비관적 락을 쓴다.
+  - 상태 전이처럼 규칙을 확인한 뒤 바꿔야 하고, 경쟁이 주문 하나 단위로 작을 때는 비관적 락이 맞다. (6.5 "다른 방식이 맞는 상황" 참고)
+
+### 10.9 실패한 메시지의 무한 재전송 [설계 중 예방]
+
+- **증상 (예상)**
+  - 처리할 수 없는 메시지 하나가 같은 실패를 끝없이 반복하며 에러 로그를 채우고, 브로커와 DB에 계속 부하를 준다.
+- **원인**
+  - Spring AMQP의 기본 설정은 리스너에서 예외가 나면 메시지를 다시 큐에 넣는다. 다시 처리해도 같은 이유로 실패하는 메시지라면 이 과정이 끝없이 반복된다.
+- **조치**
+  - 재시도를 처음 포함 최대 3번(1초, 2초 간격)으로 제한했다. 모두 실패하면 `SagaMessageRecoverer`가 eventId와 원인을 ERROR 로그로 남기고, 다시 큐에 넣지 않는다(`default-requeue-rejected: false`).
+  - 재고 부족·없는 상품, 포인트 부족·없는 회원처럼 재시도해도 결과가 같은 실패는 리스너가 직접 잡는다. 트랜잭션만 롤백하고 메시지는 정상 처리해서 재시도하지 않는다.
+  - 없는 주문에 대한 메시지를 직접 넣어 3번 시도 후 큐에서 빠지는 것을 확인했다.
+  - 지금은 포기한 메시지가 버려진다. 실패 메시지를 보관하는 DLQ는 다음 단계에서 추가할 예정이다.
+- **배운 점**
+  - 일시적 오류(재시도하면 성공할 수 있음)와 비즈니스 실패(재시도해도 같음)는 처리 경로를 나눠야 한다.
