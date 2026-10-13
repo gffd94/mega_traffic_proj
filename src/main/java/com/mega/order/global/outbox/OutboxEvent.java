@@ -43,7 +43,8 @@ public class OutboxEvent {
 	@Column(nullable = false, length = 50)
 	private String eventType;
 
-	@Column(nullable = false, columnDefinition = "json")
+	// json 타입은 저장할 때 소수를 double로 바꿔(6001.00 → 6001.0) 금액이 double을 거치게 되므로 text로 원문 그대로 저장한다
+	@Column(nullable = false, columnDefinition = "text")
 	private String payload;
 
 	@Enumerated(EnumType.STRING)

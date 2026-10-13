@@ -9,41 +9,35 @@ import static com.mega.order.global.config.SagaTopology.PAYMENT_STOCK_RESERVED_Q
 import static com.mega.order.global.config.SagaTopology.PRODUCT_ORDER_CREATED_QUEUE;
 import static com.mega.order.global.config.SagaTopology.STOCK_RESERVED_ROUTING_KEY;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.core.AmqpAdmin;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * 여기 선언한 Exchange/Queue/Binding 빈은 RabbitAdmin(Spring Boot 자동 구성)이
  * RabbitMQ 연결이 맺어질 때마다 브로커에 선언한다. 같은 설정으로 이미 있으면 그대로 둔다.
+ * 컨슈머(@RabbitListener)가 기동 시점에 연결을 맺으므로 앱이 뜨면 바로 선언된다.
  */
-@Slf4j
 @Configuration
 public class RabbitMqConfig {
 
 	/**
-	 * 아직 컨슈머가 없어서, 그냥 두면 첫 메시지를 보낼 때까지 연결이 맺어지지 않아 큐가 생기지 않는다.
-	 * 메시지가 오기 전에도 큐가 있어야 다른 도메인이 보낸 메시지가 버려지지 않으므로 기동 시점에 선언한다.
-	 * RabbitMQ가 내려가 있어도 앱 기동은 막지 않는다. 나중에 연결이 맺어질 때 RabbitAdmin이 다시 선언한다.
+	 * @RabbitListener 메서드의 파라미터 타입(이벤트 record)으로 JSON body를 역직렬화한다.
+	 * Spring이 관리하는 ObjectMapper를 써서 HTTP 쪽과 같은 Jackson 설정을 따른다.
+	 * 금액(BigDecimal)은 JSON의 숫자 텍스트에서 바로 만들어지므로 double을 거치지 않는다.
+	 * Relay는 이미 JSON 문자열인 payload를 Message로 직접 보내므로 이 변환기를 거치지 않는다.
 	 */
 	@Bean
-	public ApplicationRunner sagaTopologyDeclarer(AmqpAdmin amqpAdmin) {
-		return args -> {
-			try {
-				amqpAdmin.initialize();
-			} catch (AmqpException e) {
-				log.warn("기동 시 RabbitMQ 토폴로지 선언 실패. 연결이 맺어질 때 다시 선언된다.", e);
-			}
-		};
+	public MessageConverter jsonMessageConverter(ObjectMapper objectMapper) {
+		return new Jackson2JsonMessageConverter(objectMapper);
 	}
 
 	@Bean

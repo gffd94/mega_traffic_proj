@@ -178,7 +178,7 @@ Table outbox_events {
   aggregate_type varchar(30) [not null]    // ORDER, STOCK, PAYMENT
   aggregate_id bigint [not null]
   event_type varchar(50) [not null]
-  payload json [not null]
+  payload text [not null]                 // json 타입은 소수를 double로 바꿔 저장하므로 원문 그대로 저장하려고 text 사용
   status varchar(20) [not null]            // READY, PUBLISHED
   created_at datetime [not null]
   published_at datetime
@@ -370,6 +370,10 @@ sequenceDiagram
 - 캐시 대상: 상품 이름·가격 (Cache-Aside, TTL 적용)
 - **재고는 캐시하지 않는다.** 결제마다 바뀌는 값이라 캐시하면 정합성이 깨진다.
 
+### 6.7 알려진 한계
+
+- **Outbox Relay는 서버 1대를 가정한다.** 서버 여러 대가 동시에 Relay를 돌리면 같은 `READY` 이벤트를 각자 발행할 수 있다. 여러 대로 늘릴 때는 `SELECT ... FOR UPDATE SKIP LOCKED` 등으로 조회 대상을 나눠야 한다.
+
 ---
 
 ## 7. 시스템 아키텍처
@@ -423,7 +427,7 @@ com.mega.order
  ┃  ┣ exception       // 전역 예외 처리
  ┃  ┣ outbox          // OutboxEvent 엔티티, 저장 헬퍼, Relay 스케줄러
  ┃  ┗ idempotency     // ProcessedEvent 엔티티, 중복 체크 헬퍼
- ┣ user               // 회원, 포인트 조회/충전
+ ┣ user               // 회원, 포인트 조회/충전, 포인트 차감 창구(PointDeductor)
  ┣ product            // 상품, 재고 예약/복구
  ┃  ┗ messaging       // OrderCreated, PaymentFailed 컨슈머
  ┣ order              // 주문 접수, 상태 조회, 확정/취소
@@ -434,6 +438,7 @@ com.mega.order
 
 - 각 도메인은 `controller / service / repository / entity`를 가진다.
 - **도메인 간 서비스 직접 호출 금지.** 다른 도메인에 영향을 주는 작업은 이벤트로만 전달한다. 단, 읽기는 각 도메인이 제공하는 Reader를 통해 허용한다. 상태 변경은 이벤트로만 한다.
+- **예외: 포인트 차감.** 포인트 차감은 user가 제공하는 `PointDeductor`를 통해 payment가 수행한다. 차감과 결제 기록이 한 트랜잭션으로 묶여야 하기 때문이다. 다른 도메인이 user 상태를 바꾸는 창구는 이것 하나로 제한한다. 물리적으로 서버를 나누면 포인트 잔액은 payment 서비스로 옮긴다.
 
 ---
 

@@ -10,9 +10,13 @@ import java.util.Map;
 public final class OutboxEventTypes {
 
 	public static final String ORDER_CREATED = "OrderCreated";
+	public static final String STOCK_RESERVED = "StockReserved";
+	public static final String PAYMENT_COMPLETED = "PaymentCompleted";
 
 	private static final Map<String, String> ROUTING_KEY_BY_EVENT_TYPE = Map.of(
-			ORDER_CREATED, SagaTopology.ORDER_CREATED_ROUTING_KEY
+			ORDER_CREATED, SagaTopology.ORDER_CREATED_ROUTING_KEY,
+			STOCK_RESERVED, SagaTopology.STOCK_RESERVED_ROUTING_KEY,
+			PAYMENT_COMPLETED, SagaTopology.PAYMENT_COMPLETED_ROUTING_KEY
 	);
 
 	private OutboxEventTypes() {

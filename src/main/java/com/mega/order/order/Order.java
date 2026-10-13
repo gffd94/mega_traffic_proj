@@ -80,6 +80,10 @@ public class Order extends BaseTimeEntity {
 		this.cancelReason = reason;
 	}
 
+	public boolean isFinished() {
+		return this.status == OrderStatus.COMPLETED || this.status == OrderStatus.CANCELED;
+	}
+
 	private void validateTotalPrice(BigDecimal totalPrice) {
 		if (totalPrice == null || totalPrice.signum() <= 0) {
 			throw new IllegalArgumentException("주문 총액은 0보다 커야 합니다. 입력 총액: " + totalPrice);
