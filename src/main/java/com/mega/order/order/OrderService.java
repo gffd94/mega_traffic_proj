@@ -2,6 +2,9 @@ package com.mega.order.order;
 
 import com.mega.order.global.exception.OrderNotFoundException;
 import com.mega.order.global.exception.UserNotFoundException;
+import com.mega.order.global.outbox.AggregateType;
+import com.mega.order.global.outbox.OutboxEventRecorder;
+import com.mega.order.global.outbox.OutboxEventTypes;
 import com.mega.order.order.dto.OrderCreateRequest;
 import com.mega.order.order.dto.OrderItemRequest;
 import com.mega.order.order.dto.OrderResponse;
@@ -27,6 +30,7 @@ public class OrderService {
 	private final OrderMapper orderMapper;
 	private final UserReader userReader;
 	private final ProductReader productReader;
+	private final OutboxEventRecorder outboxEventRecorder;
 
 	@Transactional
 	public OrderResponse create(String idempotencyKey, OrderCreateRequest request) {
@@ -52,6 +56,10 @@ public class OrderService {
 				.map(item -> orderMapper.toItemEntity(savedOrder, item, priceByProductId.get(item.productId())))
 				.toList();
 		orderItemRepository.saveAll(orderItems);
+
+		// 주문과 같은 트랜잭션에서 기록해야 주문이 롤백되면 이벤트도 함께 사라진다
+		outboxEventRecorder.record(AggregateType.ORDER, savedOrder.getId(), OutboxEventTypes.ORDER_CREATED,
+				orderMapper.toCreatedEvent(savedOrder, orderItems));
 
 		return orderMapper.toResponse(savedOrder);
 	}
