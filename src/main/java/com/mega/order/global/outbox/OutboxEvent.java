@@ -67,12 +67,4 @@ public class OutboxEvent {
 		this.status = OutboxEventStatus.READY;
 	}
 
-	public void markPublished() {
-		if (this.status != OutboxEventStatus.READY) {
-			throw new IllegalStateException("현재 상태 " + this.status + "에서는 발행 완료 처리를 할 수 없습니다.");
-		}
-		this.status = OutboxEventStatus.PUBLISHED;
-		this.publishedAt = LocalDateTime.now();
-	}
-
 }

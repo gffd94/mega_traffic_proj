@@ -7,6 +7,7 @@ import com.mega.order.order.OrderRepository;
 import com.mega.order.order.OrderStatus;
 import com.mega.order.order.OrderStatusCount;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -46,6 +47,8 @@ public class SagaMetrics {
 	private final Counter relayPublished;
 	private final Counter relayConfirmFailed;
 	private final Counter relayReturned;
+	private final DistributionSummary relayBatchSize;
+	private final Timer relayBatchDuration;
 
 	private Map<OrderStatus, Long> orderStatusCounts = Map.of();
 	private long orderStatusCountedAtNanos;
@@ -84,6 +87,15 @@ public class SagaMetrics {
 				.register(registry);
 		this.relayConfirmFailed = relayFailedCounter(registry, "confirm_failed");
 		this.relayReturned = relayFailedCounter(registry, "returned");
+		this.relayBatchSize = DistributionSummary.builder("mega.outbox.relay.batch.size")
+				.description("Relay가 한 번에 조회해 처리한 이벤트 수 (빈 조회는 기록하지 않음)")
+				.register(registry);
+		this.relayBatchDuration = Timer.builder("mega.outbox.relay.batch.duration")
+				.description("Relay 배치 1회 처리 시간: 조회 + 전송 + confirm 대기 + PUBLISHED 표시 (빈 조회는 기록하지 않음)")
+				.publishPercentileHistogram()
+				.minimumExpectedValue(Duration.ofMillis(1))
+				.maximumExpectedValue(Duration.ofSeconds(10))
+				.register(registry);
 	}
 
 	/** 주문이 실제로 COMPLETED로 바뀌었을 때(complete()가 true) 같은 트랜잭션 안에서 호출한다. */
@@ -100,6 +112,12 @@ public class SagaMetrics {
 			ordersCanceled.get(reason).increment();
 			sagaCanceledDuration.record(elapsedSince(orderedAt));
 		});
+	}
+
+	/** 이벤트를 1건 이상 가져온 배치가 끝날 때마다 호출한다 */
+	public void relayBatch(int size, Duration elapsed) {
+		relayBatchSize.record(size);
+		relayBatchDuration.record(elapsed);
 	}
 
 	public void relayPublished() {

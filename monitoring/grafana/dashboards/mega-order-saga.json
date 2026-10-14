@@ -10,7 +10,7 @@
   "graphTooltip": 1,
   "refresh": "5s",
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "time": {
     "from": "now-15m",
     "to": "now"
@@ -362,7 +362,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 13,
       "type": "row",
       "title": "진단용",
       "collapsed": true,
@@ -576,6 +576,128 @@
           "fieldConfig": {
             "defaults": {
               "unit": "ops",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": true
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "calcs": []
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Relay 배치 크기",
+          "description": "한 번 조회해 처리한 이벤트 수 (빈 조회 제외). 100에 붙어 있으면 READY가 밀려 있어 쉬지 않고 연달아 처리 중이다",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 32,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(mega_outbox_relay_batch_size_sum{application=\"mega-order\"}[$__rate_interval])) / sum(rate(mega_outbox_relay_batch_size_count{application=\"mega-order\"}[$__rate_interval]))",
+              "legendFormat": "평균",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max(mega_outbox_relay_batch_size_max{application=\"mega-order\"})",
+              "legendFormat": "최대",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": true
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "calcs": []
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Relay 배치 처리 시간",
+          "description": "배치 1회: 조회 + 전송 + confirm 대기 + PUBLISHED 표시 (빈 조회 제외)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 32,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(mega_outbox_relay_batch_duration_seconds_bucket{application=\"mega-order\"}[$__rate_interval])))",
+              "legendFormat": "p95",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(rate(mega_outbox_relay_batch_duration_seconds_sum{application=\"mega-order\"}[$__rate_interval])) / sum(rate(mega_outbox_relay_batch_duration_seconds_count{application=\"mega-order\"}[$__rate_interval]))",
+              "legendFormat": "평균",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
               "min": 0,
               "custom": {
                 "drawStyle": "line",

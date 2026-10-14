@@ -1,0 +1,508 @@
+{
+  "label": "before",
+  "rate": 2,
+  "run": "2",
+  "durationSeconds": 60,
+  "vus": 10,
+  "runTag": "saga-r2-2-1791961933504",
+  "finishedAt": "2026-10-14T07:13:35.472Z",
+  "orders": {
+    "accepted": 121,
+    "rejected": 0,
+    "droppedIterations": 0,
+    "acceptedPerSec": 2.02,
+    "settled": 121,
+    "finished": 121,
+    "unfinished": 0,
+    "byResult": {
+      "COMPLETED": 97,
+      "OUT_OF_STOCK": 9,
+      "PAYMENT_FAILED": 15,
+      "UNFINISHED": 0
+    },
+    "byKind": {
+      "success": {
+        "COMPLETED": 92,
+        "OUT_OF_STOCK": 0,
+        "PAYMENT_FAILED": 0,
+        "UNFINISHED": 0
+      },
+      "out_of_stock": {
+        "COMPLETED": 5,
+        "OUT_OF_STOCK": 9,
+        "PAYMENT_FAILED": 0,
+        "UNFINISHED": 0
+      },
+      "payment_failed": {
+        "COMPLETED": 0,
+        "OUT_OF_STOCK": 0,
+        "PAYMENT_FAILED": 15,
+        "UNFINISHED": 0
+      }
+    }
+  },
+  "createLatencyMs": {
+    "avg": 37.62,
+    "med": 35.14,
+    "p95": 61.32,
+    "p99": 82.25,
+    "max": 145.18
+  },
+  "drainSeconds": 3.13,
+  "inProgressAtDeadline": null,
+  "finishedPerSec": 1.92,
+  "prometheus": {
+    "relayPublishPerSecMax": 6.201,
+    "outboxReadyMax": 8,
+    "queueWaitingTotalMax": 3,
+    "sagaDurationP95Seconds": 3.84,
+    "postOrdersServerP95Seconds": 0.059,
+    "hikariPendingMax": 0,
+    "hikariActiveMax": 1,
+    "finishPerSecMax": 2.134,
+    "relayBatchSizeAvg": 0,
+    "relayBatchDurationAvgSeconds": 0,
+    "relayBatchDurationP95Seconds": 0,
+    "processCpuMax": 0.084,
+    "systemCpuMax": 0.182
+  },
+  "dlqMessages": 0,
+  "checks": {
+    "trackedAllOrders": true,
+    "stockLedger": true,
+    "pointLedger": true,
+    "noUnfinishedOrders": true,
+    "dlqEmpty": true,
+    "passed": true
+  },
+  "products": [
+    {
+      "index": 0,
+      "id": 55,
+      "scarce": false,
+      "initialStock": 1000000,
+      "completedQuantity": 42,
+      "expected": 999958,
+      "remaining": 999958,
+      "pass": true
+    },
+    {
+      "index": 1,
+      "id": 56,
+      "scarce": false,
+      "initialStock": 1000000,
+      "completedQuantity": 31,
+      "expected": 999969,
+      "remaining": 999969,
+      "pass": true
+    },
+    {
+      "index": 2,
+      "id": 57,
+      "scarce": false,
+      "initialStock": 1000000,
+      "completedQuantity": 37,
+      "expected": 999963,
+      "remaining": 999963,
+      "pass": true
+    },
+    {
+      "index": 3,
+      "id": 58,
+      "scarce": false,
+      "initialStock": 1000000,
+      "completedQuantity": 45,
+      "expected": 999955,
+      "remaining": 999955,
+      "pass": true
+    },
+    {
+      "index": 4,
+      "id": 59,
+      "scarce": false,
+      "initialStock": 1000000,
+      "completedQuantity": 40,
+      "expected": 999960,
+      "remaining": 999960,
+      "pass": true
+    },
+    {
+      "index": 5,
+      "id": 60,
+      "scarce": true,
+      "initialStock": 5,
+      "completedQuantity": 5,
+      "expected": 0,
+      "remaining": 0,
+      "pass": true
+    }
+  ],
+  "users": [
+    {
+      "index": 0,
+      "id": 325,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 44500,
+      "expected": 99955500,
+      "remaining": 99955500,
+      "pass": true
+    },
+    {
+      "index": 1,
+      "id": 326,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 27000,
+      "expected": 99973000,
+      "remaining": 99973000,
+      "pass": true
+    },
+    {
+      "index": 2,
+      "id": 327,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 0,
+      "expected": 100000000,
+      "remaining": 100000000,
+      "pass": true
+    },
+    {
+      "index": 3,
+      "id": 328,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 13500,
+      "expected": 99986500,
+      "remaining": 99986500,
+      "pass": true
+    },
+    {
+      "index": 4,
+      "id": 329,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 30500,
+      "expected": 99969500,
+      "remaining": 99969500,
+      "pass": true
+    },
+    {
+      "index": 5,
+      "id": 330,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 63000,
+      "expected": 99937000,
+      "remaining": 99937000,
+      "pass": true
+    },
+    {
+      "index": 6,
+      "id": 331,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 22000,
+      "expected": 99978000,
+      "remaining": 99978000,
+      "pass": true
+    },
+    {
+      "index": 7,
+      "id": 332,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 58000,
+      "expected": 99942000,
+      "remaining": 99942000,
+      "pass": true
+    },
+    {
+      "index": 8,
+      "id": 333,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 13500,
+      "expected": 99986500,
+      "remaining": 99986500,
+      "pass": true
+    },
+    {
+      "index": 9,
+      "id": 334,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 28000,
+      "expected": 99972000,
+      "remaining": 99972000,
+      "pass": true
+    },
+    {
+      "index": 10,
+      "id": 335,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 32500,
+      "expected": 99967500,
+      "remaining": 99967500,
+      "pass": true
+    },
+    {
+      "index": 11,
+      "id": 336,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 3000,
+      "expected": 99997000,
+      "remaining": 99997000,
+      "pass": true
+    },
+    {
+      "index": 12,
+      "id": 337,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 32000,
+      "expected": 99968000,
+      "remaining": 99968000,
+      "pass": true
+    },
+    {
+      "index": 13,
+      "id": 338,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 0,
+      "expected": 100000000,
+      "remaining": 100000000,
+      "pass": true
+    },
+    {
+      "index": 14,
+      "id": 339,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 27000,
+      "expected": 99973000,
+      "remaining": 99973000,
+      "pass": true
+    },
+    {
+      "index": 15,
+      "id": 340,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 8000,
+      "expected": 99992000,
+      "remaining": 99992000,
+      "pass": true
+    },
+    {
+      "index": 16,
+      "id": 341,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 17500,
+      "expected": 99982500,
+      "remaining": 99982500,
+      "pass": true
+    },
+    {
+      "index": 17,
+      "id": 342,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 13500,
+      "expected": 99986500,
+      "remaining": 99986500,
+      "pass": true
+    },
+    {
+      "index": 18,
+      "id": 343,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 33500,
+      "expected": 99966500,
+      "remaining": 99966500,
+      "pass": true
+    },
+    {
+      "index": 19,
+      "id": 344,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 85500,
+      "expected": 99914500,
+      "remaining": 99914500,
+      "pass": true
+    },
+    {
+      "index": 20,
+      "id": 345,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 4500,
+      "expected": 99995500,
+      "remaining": 99995500,
+      "pass": true
+    },
+    {
+      "index": 21,
+      "id": 346,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 42000,
+      "expected": 99958000,
+      "remaining": 99958000,
+      "pass": true
+    },
+    {
+      "index": 22,
+      "id": 347,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 37500,
+      "expected": 99962500,
+      "remaining": 99962500,
+      "pass": true
+    },
+    {
+      "index": 23,
+      "id": 348,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 39000,
+      "expected": 99961000,
+      "remaining": 99961000,
+      "pass": true
+    },
+    {
+      "index": 24,
+      "id": 349,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 32500,
+      "expected": 99967500,
+      "remaining": 99967500,
+      "pass": true
+    },
+    {
+      "index": 25,
+      "id": 350,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 34000,
+      "expected": 99966000,
+      "remaining": 99966000,
+      "pass": true
+    },
+    {
+      "index": 26,
+      "id": 351,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 25000,
+      "expected": 99975000,
+      "remaining": 99975000,
+      "pass": true
+    },
+    {
+      "index": 27,
+      "id": 352,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 12000,
+      "expected": 99988000,
+      "remaining": 99988000,
+      "pass": true
+    },
+    {
+      "index": 28,
+      "id": 353,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 19500,
+      "expected": 99980500,
+      "remaining": 99980500,
+      "pass": true
+    },
+    {
+      "index": 29,
+      "id": 354,
+      "poor": false,
+      "initialPoint": 100000000,
+      "completedAmount": 6500,
+      "expected": 99993500,
+      "remaining": 99993500,
+      "pass": true
+    },
+    {
+      "index": 30,
+      "id": 355,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    },
+    {
+      "index": 31,
+      "id": 356,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    },
+    {
+      "index": 32,
+      "id": 357,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    },
+    {
+      "index": 33,
+      "id": 358,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    },
+    {
+      "index": 34,
+      "id": 359,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    },
+    {
+      "index": 35,
+      "id": 360,
+      "poor": true,
+      "initialPoint": 1000,
+      "completedAmount": 0,
+      "expected": 1000,
+      "remaining": 1000,
+      "pass": true
+    }
+  ],
+  "grafana": {
+    "from": "2026-10-14T07:12:13.504Z",
+    "loadEnd": "2026-10-14T07:13:15.938Z",
+    "to": "2026-10-14T07:13:35.085Z",
+    "url": "http://localhost:3000/d/mega-order-saga?from=1791961933504&to=1791962015085"
+  }
+}

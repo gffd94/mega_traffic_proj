@@ -6,13 +6,14 @@
 // -e 옵션
 //   RATE           : 초당 주문 수 (필수)
 //   RUN            : 회차 번호. 결과 파일 이름에 쓴다 (기본값 1)
+//   LABEL          : 비교 실험용 이름(예: before, after). 주면 결과 파일 이름에 붙는다 (기본값 없음)
 //   DURATION       : 주문을 넣는 시간(초) (기본값 60)
 //   DRAIN_MAX      : 부하가 끝난 뒤 진행 중 주문이 0이 되기를 기다리는 최대 시간(초) (기본값 180)
 //   BASE_URL       : 기본값 http://localhost:8080
 //   PROMETHEUS_URL : 기본값 http://localhost:9090
 //   GRAFANA_URL    : 기본값 http://localhost:3000
 //
-// 결과 요약은 콘솔에 출력하고 loadtest/results/saga-rate{RATE}-run{RUN}.json 으로 저장한다.
+// 결과 요약은 콘솔에 출력하고 loadtest/results/saga[-{LABEL}]-rate{RATE}-run{RUN}.json 으로 저장한다.
 //
 // 진행 순서
 //   1. setup    : 이번 실행 전용 상품·회원을 만든다
@@ -33,6 +34,7 @@ import { Counter, Gauge, Trend } from 'k6/metrics';
 
 const RATE = parseInt(__ENV.RATE, 10);
 const RUN = __ENV.RUN || '1';
+const LABEL = __ENV.LABEL || '';
 const DURATION = parseInt(__ENV.DURATION || '60', 10);
 const DRAIN_MAX = parseInt(__ENV.DRAIN_MAX || '180', 10);
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
@@ -99,6 +101,13 @@ const PROM_QUERIES = {
 	hikariPendingMax: (w) => `max_over_time(sum(hikaricp_connections_pending)[${w}s:5s])`,
 	hikariActiveMax: (w) => `max_over_time(sum(hikaricp_connections_active)[${w}s:5s])`,
 	finishPerSecMax: (w) => `max_over_time((sum(rate(mega_orders_completed_total[20s])) + sum(rate(mega_orders_canceled_total[20s])))[${w}s:5s])`,
+	// Relay 배치 지표 (배치 방식 Relay에만 있음. 없으면 null)
+	relayBatchSizeAvg: (w) => `sum(increase(mega_outbox_relay_batch_size_sum[${w}s])) / sum(increase(mega_outbox_relay_batch_size_count[${w}s]))`,
+	relayBatchDurationAvgSeconds: (w) => `sum(increase(mega_outbox_relay_batch_duration_seconds_sum[${w}s])) / sum(increase(mega_outbox_relay_batch_duration_seconds_count[${w}s]))`,
+	relayBatchDurationP95Seconds: (w) => `histogram_quantile(0.95, sum by (le) (increase(mega_outbox_relay_batch_duration_seconds_bucket[${w}s])))`,
+	// 앱 프로세스와 기기 전체 CPU 사용률(0~1). 앱·k6·Docker가 같은 기기에서 돌므로 기기 전체 값도 본다
+	processCpuMax: (w) => `max_over_time(process_cpu_usage[${w}s])`,
+	systemCpuMax: (w) => `max_over_time(system_cpu_usage[${w}s])`,
 };
 
 // 태그가 붙은 지표는 threshold로 등록해야 handleSummary에 태그별 값이 나온다 (조건은 항상 참)
@@ -369,6 +378,7 @@ export function handleSummary(data) {
 
 	const trend = metric('order_create_duration') || {};
 	const summary = {
+		label: LABEL || null,
 		rate: RATE,
 		run: RUN,
 		durationSeconds: DURATION,
@@ -406,7 +416,7 @@ export function handleSummary(data) {
 
 	return {
 		stdout: report(summary),
-		[`loadtest/results/saga-rate${RATE}-run${RUN}.json`]: JSON.stringify(summary, null, 2),
+		[`loadtest/results/saga${LABEL ? '-' + LABEL : ''}-rate${RATE}-run${RUN}.json`]: JSON.stringify(summary, null, 2),
 	};
 }
 
@@ -417,7 +427,7 @@ function report(s) {
 	const r = s.orders.byResult;
 	return `
 ==================== 주문 Saga 부하 테스트 결과 ====================
-RATE ${s.rate}/s × ${s.durationSeconds}s, RUN ${s.run}, VU ${s.vus}
+${s.label ? s.label + ', ' : ''}RATE ${s.rate}/s × ${s.durationSeconds}s, RUN ${s.run}, VU ${s.vus}
 
 [주문]  접수 ${s.orders.accepted} (${s.orders.acceptedPerSec}/s), 거절 ${s.orders.rejected}, 못 보낸 요청(dropped) ${s.orders.droppedIterations}
   결과: COMPLETED ${r.COMPLETED} / OUT_OF_STOCK ${r.OUT_OF_STOCK} / PAYMENT_FAILED ${r.PAYMENT_FAILED} / 미완료 ${r.UNFINISHED}

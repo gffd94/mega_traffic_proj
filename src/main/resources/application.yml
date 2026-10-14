@@ -54,6 +54,14 @@ spring:
           initial-interval: 1000ms
           multiplier: 2
 
+mega:
+  outbox:
+    relay:
+      # READY가 바닥났을 때 다음 조회까지 쉬는 시간. 꽉 찬 배치(100건)는 쉬지 않고 바로 이어서 조회한다
+      idle-delay-ms: 100
+      # 한 배치의 confirm을 모두 기다리는 상한. 넘긴 이벤트는 READY로 남아 다음 조회에서 다시 전송된다
+      confirm-timeout: 5s
+
 management:
   endpoints:
     web:
