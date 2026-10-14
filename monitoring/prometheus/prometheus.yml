@@ -1,0 +1,28 @@
+global:
+  # 부하 테스트(수십 초~수 분) 중 변화를 잡으려면 기본값(1분)은 너무 성기다
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Spring Boot 앱 (호스트에서 gradlew bootRun). compose.yaml의 extra_hosts로 Linux에서도 이 이름이 풀린다
+  - job_name: app
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+
+  # RabbitMQ 전체 합산 지표 (연결, 채널, 초당 publish/deliver 등). 큐 지표는 모든 큐를 더한 값 하나만 나온다
+  - job_name: rabbitmq
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  # 큐 이름별 지표 (queue 라벨). DLQ(mega.saga.dlq)도 여기서 따로 보인다.
+  # /metrics/per-object는 모든 객체의 모든 지표를 내보내 무거우므로, 필요한 family만 골라 받는다.
+  - job_name: rabbitmq-queues
+    metrics_path: /metrics/detailed
+    params:
+      family:
+        - queue_coarse_metrics  # rabbitmq_detailed_queue_messages{,_ready,_unacked}
+        - queue_consumer_count  # rabbitmq_detailed_queue_consumers
+    static_configs:
+      - targets: ["rabbitmq:15692"]

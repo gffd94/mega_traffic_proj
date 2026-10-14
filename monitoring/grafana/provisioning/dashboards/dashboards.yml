@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: mega-order
+    folder: Mega Order
+    type: file
+    # 대시보드의 기준은 저장소의 JSON 파일이다. UI에서 고친 내용은 저장되지 않으니 JSON을 고쳐서 커밋한다
+    allowUiUpdates: false
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

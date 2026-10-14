@@ -3,6 +3,7 @@ package com.mega.order.order;
 import com.mega.order.global.exception.OrderNotFoundException;
 import com.mega.order.global.exception.UserNotFoundException;
 import com.mega.order.global.idempotency.ProcessedEventRecorder;
+import com.mega.order.global.monitoring.SagaMetrics;
 import com.mega.order.global.outbox.AggregateType;
 import com.mega.order.global.outbox.OutboxEventRecorder;
 import com.mega.order.global.outbox.OutboxEventTypes;
@@ -33,6 +34,7 @@ public class OrderService {
 	private final ProductReader productReader;
 	private final OutboxEventRecorder outboxEventRecorder;
 	private final ProcessedEventRecorder processedEventRecorder;
+	private final SagaMetrics sagaMetrics;
 
 	@Transactional
 	public OrderResponse create(String idempotencyKey, OrderCreateRequest request) {
@@ -70,6 +72,7 @@ public class OrderService {
 	 * 아래 세 메서드는 반영했으면 true, 늦게 온 이벤트라 무시했으면 false를 돌려준다.
 	 * 무시할지는 Order가 판단한다 (Order의 상태 변경 메서드 주석 참고).
 	 * 무시한 경우에도 처리 기록은 커밋된다. 같은 이벤트가 다시 와도 주문 행을 잠그기 전에 걸러진다.
+	 * 완료/취소 지표는 실제로 반영한 경우(true)에만, 커밋된 뒤에 오른다 (SagaMetrics 참고).
 	 */
 
 	@Transactional
@@ -81,13 +84,23 @@ public class OrderService {
 	@Transactional
 	public boolean complete(Long orderId, String consumer, String eventId) {
 		processedEventRecorder.record(consumer, eventId);
-		return findOrderForUpdate(orderId).complete();
+		Order order = findOrderForUpdate(orderId);
+		boolean completed = order.complete();
+		if (completed) {
+			sagaMetrics.orderCompleted(order.getCreatedAt());
+		}
+		return completed;
 	}
 
 	@Transactional
 	public boolean cancel(Long orderId, CancelReason reason, String consumer, String eventId) {
 		processedEventRecorder.record(consumer, eventId);
-		return findOrderForUpdate(orderId).cancel(reason);
+		Order order = findOrderForUpdate(orderId);
+		boolean canceled = order.cancel(reason);
+		if (canceled) {
+			sagaMetrics.orderCanceled(reason, order.getCreatedAt());
+		}
+		return canceled;
 	}
 
 	@Transactional(readOnly = true)

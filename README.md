@@ -15,6 +15,8 @@ Saga · Transactional Outbox · 멱등 컨슈머 · 조건부 UPDATE
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ_4.0-FF6600?style=flat-square&logo=rabbitmq&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis_7.4-DC382D?style=flat-square&logo=redis&logoColor=white)
 ![k6](https://img.shields.io/badge/k6-7D64FF?style=flat-square&logo=k6&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus_3.5-E6522C?style=flat-square&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana_12.1-F46800?style=flat-square&logo=grafana&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 </div>
@@ -709,7 +711,7 @@ docker exec mega-rabbitmq rabbitmqctl delete_queue product.order-created --if-em
 
 ```bash
 cp .env.example .env    # 값 채우기 (compose.yaml과 application.yml이 함께 사용)
-docker compose up -d    # MySQL, Redis, RabbitMQ
+docker compose up -d    # MySQL, Redis, RabbitMQ, Prometheus, Grafana
 ./gradlew bootRun       # 반드시 프로젝트 루트에서 실행 (.env 경로 기준)
 ```
 
@@ -717,10 +719,14 @@ docker compose up -d    # MySQL, Redis, RabbitMQ
 |---|---|---|
 | MySQL | `3307` | DB `mega_order`, utf8mb4, Asia/Seoul |
 | Redis | `6379` | AOF 활성화 |
-| RabbitMQ | `5672` / `15672` | AMQP / 관리 UI http://localhost:15672 |
+| RabbitMQ | `5672` / `15672` / `15692` | AMQP / 관리 UI http://localhost:15672 / Prometheus 지표 |
+| Prometheus | `9090` | 앱(`host.docker.internal:8080/actuator/prometheus`)과 RabbitMQ를 5초마다 수집 |
+| Grafana | `3000` | `admin` / `.env`의 `GRAFANA_ADMIN_PASSWORD`. 대시보드 "Mega Order - Saga" 자동 등록 |
 
 - `.env`는 git에 올리지 않는다. 키 목록은 `.env.example` 참고.
 - 데이터는 Docker volume에 유지된다. 초기화하려면 `docker compose down -v`.
+- Grafana 데이터소스·대시보드는 `monitoring/grafana/` 파일로 등록된다. UI에서 고친 대시보드는 저장되지 않으므로 JSON 파일을 고쳐서 커밋한다.
+- `GRAFANA_ADMIN_PASSWORD`는 grafana-data 볼륨이 처음 만들어질 때만 적용된다.
 
 <details>
 <summary><b>k6 부하 테스트 실행</b></summary>

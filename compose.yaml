@@ -39,14 +39,59 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+      # rabbitmq_prometheus 플러그인 지표 (/metrics, /metrics/detailed)
+      - "15692:15692"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      # 이미지 기본값에 기대지 않고 Prometheus 플러그인을 켠 상태를 저장소에 고정한다
+      - ./monitoring/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: mega-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    # 앱은 호스트에서 gradlew bootRun으로 돈다. Docker Desktop(Windows/macOS)은 host.docker.internal을 기본 제공하지만
+    # Linux는 없으므로 호스트 게이트웨이로 직접 연결해 둔다
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: mega-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # 처음 기동해서 grafana-data 볼륨이 만들어질 때만 적용된다. 이후 바꾸려면 grafana-cli나 UI로 변경
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      TZ: Asia/Seoul
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
     restart: unless-stopped
 
 volumes:
   mysql-data:
   redis-data:
   rabbitmq-data:
+  prometheus-data:
+  grafana-data:

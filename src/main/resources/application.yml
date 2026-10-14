@@ -53,3 +53,17 @@ spring:
           max-attempts: 3
           initial-interval: 1000ms
           multiplier: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Prometheus 스크레이프와 상태 확인에 필요한 것만 연다 (env, beans 등은 설정값이 노출되므로 닫아 둔다)
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # Grafana에서 histogram_quantile로 p95를 계산하려면 버킷(_bucket)이 필요하다
+      percentiles-histogram:
+        http.server.requests: true

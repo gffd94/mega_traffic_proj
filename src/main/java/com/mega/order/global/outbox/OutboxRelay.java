@@ -1,6 +1,7 @@
 package com.mega.order.global.outbox;
 
 import com.mega.order.global.config.SagaTopology;
+import com.mega.order.global.monitoring.SagaMetrics;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +34,7 @@ public class OutboxRelay {
 
 	private final OutboxEventRepository outboxEventRepository;
 	private final RabbitTemplate rabbitTemplate;
+	private final SagaMetrics sagaMetrics;
 
 	// fixedDelay: 이전 실행이 끝나고 1초 뒤에 다음 실행. 전송이 느려져도 실행이 겹치지 않는다
 	@Scheduled(fixedDelay = 1000)
@@ -41,7 +43,9 @@ public class OutboxRelay {
 		for (OutboxEvent event : events) {
 			try {
 				send(event);
+				sagaMetrics.relayPublished();
 			} catch (Exception e) {
+				recordFailure(e);
 				// 이 이벤트는 READY로 남아 다음 주기에 다시 시도된다. 나머지 이벤트는 계속 처리한다
 				log.warn("Outbox 이벤트 전송 실패. eventId={}, eventType={}", event.getEventId(), event.getEventType(), e);
 				continue;
@@ -68,8 +72,16 @@ public class OutboxRelay {
 			throw new IllegalStateException("브로커가 메시지를 받지 않았습니다(nack): " + confirm.getReason());
 		}
 		if (correlationData.getReturned() != null) {
-			throw new IllegalStateException("메시지가 어떤 큐에도 라우팅되지 않았습니다. routingKey=" + routingKey
+			throw new MessageReturnedException("메시지가 어떤 큐에도 라우팅되지 않았습니다. routingKey=" + routingKey
 					+ ", replyText=" + correlationData.getReturned().getReplyText());
+		}
+	}
+
+	private void recordFailure(Exception e) {
+		if (e instanceof MessageReturnedException) {
+			sagaMetrics.relayReturned();
+		} else {
+			sagaMetrics.relayConfirmFailed();
 		}
 	}
 
@@ -81,6 +93,15 @@ public class OutboxRelay {
 		properties.setHeader("eventId", event.getEventId());
 		properties.setHeader("eventType", event.getEventType());
 		return new Message(event.getPayload().getBytes(StandardCharsets.UTF_8), properties);
+	}
+
+	// 발행 실패 지표에서 "브로커가 받지 않음(confirm 실패)"과 "받았지만 라우팅 실패(return)"를 구분하기 위한 예외
+	private static class MessageReturnedException extends IllegalStateException {
+
+		MessageReturnedException(String message) {
+			super(message);
+		}
+
 	}
 
 }
