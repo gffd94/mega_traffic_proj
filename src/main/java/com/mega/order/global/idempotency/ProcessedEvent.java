@@ -18,10 +18,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Getter
 @Entity
-@Table(name = "processed_events", uniqueConstraints = @UniqueConstraint(name = "uk_processed_consumer_event", columnNames = {"consumer", "event_id"}))
+@Table(name = "processed_events", uniqueConstraints = @UniqueConstraint(name = ProcessedEvent.UNIQUE_CONSTRAINT, columnNames = {"consumer", "event_id"}))
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProcessedEvent {
+
+	// 중복 이벤트 판별(DuplicateEventGuard)에 쓰므로 이름을 상수로 둔다
+	public static final String UNIQUE_CONSTRAINT = "uk_processed_consumer_event";
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

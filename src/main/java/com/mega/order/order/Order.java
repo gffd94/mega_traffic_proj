@@ -54,30 +54,40 @@ public class Order extends BaseTimeEntity {
 		this.status = OrderStatus.PENDING;
 	}
 
-	public void reserveStock() {
-		if (this.status != OrderStatus.PENDING) {
-			throw new IllegalStateException("현재 상태 " + this.status + "에서는 재고 예약을 할 수 없습니다.");
+	/*
+	 * 상태 변경 메서드는 Saga 이벤트로만 호출되고, 이벤트는 큐마다 따로 와서 도착 순서가 바뀌거나 중복될 수 있다.
+	 * 그래서 이미 끝난 주문(COMPLETED/CANCELED)이거나 이미 목표 상태인 경우는 잘못된 요청이 아니라
+	 * "늦게 온 이벤트"로 보고, 예외 대신 false를 돌려준다(상태는 그대로). 반영했으면 true.
+	 * 예외를 던지면 컨슈머가 재시도해도 결과가 같아 메시지가 결국 버려지기만 한다.
+	 */
+
+	public boolean reserveStock() {
+		if (isFinished() || this.status == OrderStatus.STOCK_RESERVED) {
+			return false;
 		}
 		this.status = OrderStatus.STOCK_RESERVED;
+		return true;
 	}
 
-	public void complete() {
-		if (this.status != OrderStatus.PENDING && this.status != OrderStatus.STOCK_RESERVED) {
-			throw new IllegalStateException("현재 상태 " + this.status
-					+ "에서는 주문 확정을 할 수 없습니다. (PENDING 또는 STOCK_RESERVED 상태에서만 가능)");
+	// PaymentCompleted가 StockReserved보다 먼저 올 수 있으므로 PENDING에서도 바로 확정한다
+	public boolean complete() {
+		if (isFinished()) {
+			return false;
 		}
 		this.status = OrderStatus.COMPLETED;
+		return true;
 	}
 
-	public void cancel(CancelReason reason) {
+	public boolean cancel(CancelReason reason) {
 		if (reason == null) {
 			throw new IllegalArgumentException("취소 사유는 필수입니다.");
 		}
-		if (this.status != OrderStatus.PENDING && this.status != OrderStatus.STOCK_RESERVED) {
-			throw new IllegalStateException("현재 상태 " + this.status + "에서는 주문 취소를 할 수 없습니다.");
+		if (isFinished()) {
+			return false;
 		}
 		this.status = OrderStatus.CANCELED;
 		this.cancelReason = reason;
+		return true;
 	}
 
 	public boolean isFinished() {

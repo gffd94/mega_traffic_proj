@@ -373,6 +373,8 @@ sequenceDiagram
 ### 6.7 알려진 한계
 
 - **Outbox Relay는 서버 1대를 가정한다.** 서버 여러 대가 동시에 Relay를 돌리면 같은 `READY` 이벤트를 각자 발행할 수 있다. 여러 대로 늘릴 때는 `SELECT ... FOR UPDATE SKIP LOCKED` 등으로 조회 대상을 나눠야 한다.
+- **없는 상품(ProductNotFound)도 `OUT_OF_STOCK`으로 취소한다.** 지금은 상품이 사라지는 경우가 따로 없어 사유를 나누지 않았고, 구체적인 원인은 `StockReserveFailed`의 `reason`에 남는다. 상품 판매 중지 기능이 생기면 취소 사유를 분리한다.
+- **동시에 들어온 같은 이벤트는 `processed_events`의 unique 제약이 막는다.** 재전송처럼 앞선 처리가 이미 커밋된 중복은 먼저 조회해서 INSERT 없이 거르지만, 조회를 둘 다 통과한 동시 중복은 INSERT의 unique 위반으로 멈춘다. 이때 처리는 한 번만 되지만 Hibernate의 `Duplicate entry` ERROR 로그가 남는다.
 
 ---
 
@@ -578,8 +580,33 @@ com.mega.order
   - Spring AMQP의 기본 설정은 리스너에서 예외가 나면 메시지를 다시 큐에 넣는다. 다시 처리해도 같은 이유로 실패하는 메시지라면 이 과정이 끝없이 반복된다.
 - **조치**
   - 재시도를 처음 포함 최대 3번(1초, 2초 간격)으로 제한했다. 모두 실패하면 `SagaMessageRecoverer`가 eventId와 원인을 ERROR 로그로 남기고, 다시 큐에 넣지 않는다(`default-requeue-rejected: false`).
-  - 재고 부족·없는 상품, 포인트 부족·없는 회원처럼 재시도해도 결과가 같은 실패는 리스너가 직접 잡는다. 트랜잭션만 롤백하고 메시지는 정상 처리해서 재시도하지 않는다.
+  - 재고 부족·없는 상품, 포인트 부족·없는 회원처럼 재시도해도 결과가 같은 실패는 리스너가 직접 잡는다. 트랜잭션만 롤백하고, 새 트랜잭션에서 실패 이벤트(`StockReserveFailed`, `PaymentFailed`)를 기록한 뒤 메시지는 정상 처리한다.
   - 없는 주문에 대한 메시지를 직접 넣어 3번 시도 후 큐에서 빠지는 것을 확인했다.
-  - 지금은 포기한 메시지가 버려진다. 실패 메시지를 보관하는 DLQ는 다음 단계에서 추가할 예정이다.
+  - (이후) 포기한 메시지는 DLQ(`mega.saga.dlq`)로 옮겨진다. 본문 변환 불가·`eventId` 헤더 없음처럼 메시지 자체가 잘못된 경우는 재시도 없이 바로 DLQ로 보낸다 (10.10 참고).
 - **배운 점**
   - 일시적 오류(재시도하면 성공할 수 있음)와 비즈니스 실패(재시도해도 같음)는 처리 경로를 나눠야 한다.
+
+### 10.10 큐에 DLQ 설정을 추가하자 PRECONDITION_FAILED [실제 발생]
+
+- **증상**
+  - 기존 큐 7개에 `x-dead-letter-exchange`를 추가하고 앱을 띄우자 아래 에러가 재시도 간격으로 5번 반복됐다.
+    ```
+    PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange' for queue 'product.order-created' in vhost '/':
+    received the value 'mega.saga.dlx' of type 'longstr' but current is none
+    ```
+  - 그런데도 앱은 `Started`까지 정상 기동했고, 컨슈머도 7개 큐에 모두 붙었다. 겉으로는 문제가 없어 보였다.
+- **원인**
+  - RabbitMQ는 이미 있는 큐를 다른 인자로 다시 선언하는 것을 허용하지 않는다. 큐 인자는 만들 때 정해지고 나중에 바꿀 수 없다.
+  - 선언이 첫 큐에서 실패해 중간에 멈췄다. 확인해 보니 DLX(`mega.saga.dlx`)와 DLQ는 생겼지만, 기존 큐에는 DLX 인자가 없고 DLX → DLQ 바인딩도 없었다.
+  - 컨슈머는 큐 이름만 보고 붙으므로 옛 큐에서 메시지를 계속 받는다. 이 상태로 두면 reject된 메시지는 DLQ로 가지 않고 이전처럼 버려진다.
+- **조치**
+  - 앱을 멈추고, 7개 큐 모두 메시지가 0개인 것을 확인한 뒤 로컬 RabbitMQ에서 지웠다. `--if-empty`를 붙여 메시지가 남아 있으면 지우지 않게 했다.
+    ```
+    docker exec mega-rabbitmq rabbitmqctl delete_queue product.order-created --if-empty
+    (나머지 6개 큐도 같은 방법으로)
+    ```
+  - 앱을 다시 띄우자 에러 없이 7개 큐가 `x-dead-letter-exchange=mega.saga.dlx`로 다시 만들어지고, DLX → DLQ 바인딩도 생겼다.
+  - 재시도를 소진한 메시지, `eventId` 헤더가 없는 메시지, 본문을 변환할 수 없는 메시지를 직접 넣어 DLQ에 쌓이는 것을 확인했다. `x-death` 헤더의 `queue`에 원래 큐 이름이 남는다.
+- **배운 점**
+  - 큐 인자를 바꾸는 변경은 코드만 바꿔서는 반영되지 않는다. 운영 환경이라면 큐를 지우는 대신 새 이름의 큐를 만들어 옮기거나, 인자 대신 바꿀 수 있는 policy(`rabbitmqctl set_policy`)로 DLX를 지정하는 방법을 쓴다.
+  - 선언이 실패해도 앱이 정상 기동할 수 있다. 기동 후 큐 인자와 바인딩을 직접 확인해야 한다.

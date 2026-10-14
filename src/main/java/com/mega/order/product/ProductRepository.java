@@ -16,6 +16,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			+ "WHERE p.id = :id AND p.stockQuantity >= :quantity")
 	int decreaseStockIfEnough(@Param("id") Long id, @Param("quantity") int quantity);
 
+	// 보상(재고 복구)용. 되돌리는 것은 앞서 차감에 성공한 수량이므로 조건 없이 더한다.
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("UPDATE Product p SET p.stockQuantity = p.stockQuantity + :quantity, p.updatedAt = CURRENT_TIMESTAMP "
+			+ "WHERE p.id = :id")
+	int increaseStock(@Param("id") Long id, @Param("quantity") int quantity);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT p FROM Product p WHERE p.id = :id")
 	Optional<Product> findByIdForUpdate(@Param("id") Long id);

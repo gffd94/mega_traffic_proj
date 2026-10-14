@@ -12,11 +12,20 @@ public final class SagaTopology {
 	public static final String ORDER_CREATED_ROUTING_KEY = "order.created";
 	public static final String STOCK_RESERVED_ROUTING_KEY = "stock.reserved";
 	public static final String PAYMENT_COMPLETED_ROUTING_KEY = "payment.completed";
+	public static final String STOCK_RESERVE_FAILED_ROUTING_KEY = "stock.reserve-failed";
+	public static final String PAYMENT_FAILED_ROUTING_KEY = "payment.failed";
 
 	public static final String PRODUCT_ORDER_CREATED_QUEUE = "product.order-created";
 	public static final String PAYMENT_STOCK_RESERVED_QUEUE = "payment.stock-reserved";
 	public static final String ORDER_STOCK_RESERVED_QUEUE = "order.stock-reserved";
 	public static final String ORDER_PAYMENT_COMPLETED_QUEUE = "order.payment-completed";
+	public static final String ORDER_STOCK_RESERVE_FAILED_QUEUE = "order.stock-reserve-failed";
+	public static final String PRODUCT_PAYMENT_FAILED_QUEUE = "product.payment-failed";
+	public static final String ORDER_PAYMENT_FAILED_QUEUE = "order.payment-failed";
+
+	// 처리를 포기한 메시지(재시도 소진, 재시도 불가 오류)가 모이는 곳. 원래 큐는 메시지의 x-death 헤더로 알 수 있다
+	public static final String DEAD_LETTER_EXCHANGE = "mega.saga.dlx";
+	public static final String DEAD_LETTER_QUEUE = "mega.saga.dlq";
 
 	private SagaTopology() {
 	}

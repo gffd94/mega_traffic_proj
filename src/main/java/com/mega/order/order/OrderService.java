@@ -2,6 +2,7 @@ package com.mega.order.order;
 
 import com.mega.order.global.exception.OrderNotFoundException;
 import com.mega.order.global.exception.UserNotFoundException;
+import com.mega.order.global.idempotency.ProcessedEventRecorder;
 import com.mega.order.global.outbox.AggregateType;
 import com.mega.order.global.outbox.OutboxEventRecorder;
 import com.mega.order.global.outbox.OutboxEventTypes;
@@ -31,6 +32,7 @@ public class OrderService {
 	private final UserReader userReader;
 	private final ProductReader productReader;
 	private final OutboxEventRecorder outboxEventRecorder;
+	private final ProcessedEventRecorder processedEventRecorder;
 
 	@Transactional
 	public OrderResponse create(String idempotencyKey, OrderCreateRequest request) {
@@ -64,23 +66,28 @@ public class OrderService {
 		return orderMapper.toResponse(savedOrder);
 	}
 
-	/**
-	 * 재고 예약을 주문에 반영한다. 반영했으면 true를 돌려준다.
-	 * 메시지 도착 순서가 바뀌어 PaymentCompleted가 먼저 처리됐거나 이미 취소된 주문이면, 반영하지 않고 false를 돌려준다.
+	/*
+	 * 아래 세 메서드는 반영했으면 true, 늦게 온 이벤트라 무시했으면 false를 돌려준다.
+	 * 무시할지는 Order가 판단한다 (Order의 상태 변경 메서드 주석 참고).
+	 * 무시한 경우에도 처리 기록은 커밋된다. 같은 이벤트가 다시 와도 주문 행을 잠그기 전에 걸러진다.
 	 */
+
 	@Transactional
-	public boolean reserveStock(Long orderId) {
-		Order order = findOrderForUpdate(orderId);
-		if (order.isFinished()) {
-			return false;
-		}
-		order.reserveStock();
-		return true;
+	public boolean reserveStock(Long orderId, String consumer, String eventId) {
+		processedEventRecorder.record(consumer, eventId);
+		return findOrderForUpdate(orderId).reserveStock();
 	}
 
 	@Transactional
-	public void complete(Long orderId) {
-		findOrderForUpdate(orderId).complete();
+	public boolean complete(Long orderId, String consumer, String eventId) {
+		processedEventRecorder.record(consumer, eventId);
+		return findOrderForUpdate(orderId).complete();
+	}
+
+	@Transactional
+	public boolean cancel(Long orderId, CancelReason reason, String consumer, String eventId) {
+		processedEventRecorder.record(consumer, eventId);
+		return findOrderForUpdate(orderId).cancel(reason);
 	}
 
 	@Transactional(readOnly = true)
@@ -96,7 +103,7 @@ public class OrderService {
 		return orderMapper.toStatusResponse(order);
 	}
 
-	// StockReserved와 PaymentCompleted는 서로 다른 큐로 와서 다른 스레드가 같은 주문을 동시에 바꿀 수 있다.
+	// StockReserved와 PaymentCompleted/PaymentFailed는 서로 다른 큐로 와서 다른 스레드가 같은 주문을 동시에 바꿀 수 있다.
 	// 행 락으로 순서를 세워서, 한쪽이 바꾼 상태를 다른 쪽이 옛 상태로 덮어쓰지 못하게 한다.
 	private Order findOrderForUpdate(Long orderId) {
 		return orderRepository.findByIdForUpdate(orderId)
