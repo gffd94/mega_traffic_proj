@@ -977,13 +977,15 @@ k6 run -e STRATEGY=atomic -e SCENARIO=B loadtest/stock-deduction.js
 # 주문 흐름 전체 (RATE = 초당 주문 수)
 k6 run -e RATE=20 loadtest/order-saga.js
 
-# 장애 주입 (앱 강제 종료 / RabbitMQ 재시작)
-bash loadtest/crash-run.sh
+# 장애 주입 (앱 강제 종료 3회 + RabbitMQ 재시작 2회. 시작 전 docker compose down -v로 데이터를 지운다)
+./gradlew bootJar
+bash loadtest/crash-run.sh all
+# 한 회만: bash loadtest/crash-run.sh app <회차> <장애 시점(초)>  /  mq <회차> <초>
 ```
 
 - 재고 비교 `STRATEGY`: `none`, `atomic`, `pessimistic`, `optimistic`, `redisson`
 - 재고 비교 `SCENARIO`: `A`(재고 100, 200명 동시 1회), `B`(재고 100,000, 100명 30초)
-- 측정 중에는 8080에 앱이 하나만 떠 있는지 확인한다.
+- 측정 중에는 8080에 앱이 하나만 떠 있는지 확인한다. `crash-run.sh`는 앱을 직접 띄우고 죽이므로 앱을 미리 띄워 두지 않는다 (node 필요).
 
 </details>
 
