@@ -1,5 +1,7 @@
 package com.mega.order.global.config;
 
+import java.util.List;
+
 /**
  * Saga 메시징에 쓰는 RabbitMQ 이름(exchange, 큐, routing key)을 한 곳에 모은다.
  * 큐 이름은 "받는 도메인.이벤트" 형식이다. 같은 이벤트라도 받는 도메인마다 큐를 따로 두어야
@@ -22,6 +24,12 @@ public final class SagaTopology {
 	public static final String ORDER_STOCK_RESERVE_FAILED_QUEUE = "order.stock-reserve-failed";
 	public static final String PRODUCT_PAYMENT_FAILED_QUEUE = "product.payment-failed";
 	public static final String ORDER_PAYMENT_FAILED_QUEUE = "order.payment-failed";
+
+	// 컨슈머 이름은 큐 이름과 같다. 지표 태그를 미리 등록할 때 쓴다 (SagaMetrics)
+	public static final List<String> CONSUMER_QUEUES = List.of(
+			PRODUCT_ORDER_CREATED_QUEUE, PAYMENT_STOCK_RESERVED_QUEUE, ORDER_STOCK_RESERVED_QUEUE,
+			ORDER_PAYMENT_COMPLETED_QUEUE, ORDER_STOCK_RESERVE_FAILED_QUEUE, PRODUCT_PAYMENT_FAILED_QUEUE,
+			ORDER_PAYMENT_FAILED_QUEUE);
 
 	// 처리를 포기한 메시지(재시도 소진, 재시도 불가 오류)가 모이는 곳. 원래 큐는 메시지의 x-death 헤더로 알 수 있다
 	public static final String DEAD_LETTER_EXCHANGE = "mega.saga.dlx";

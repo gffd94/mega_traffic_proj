@@ -1,5 +1,6 @@
 package com.mega.order.global.monitoring;
 
+import com.mega.order.global.config.SagaTopology;
 import com.mega.order.global.outbox.OutboxEventRepository;
 import com.mega.order.global.outbox.OutboxEventStatus;
 import com.mega.order.order.CancelReason;
@@ -14,6 +15,7 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -49,6 +51,7 @@ public class SagaMetrics {
 	private final Counter relayReturned;
 	private final DistributionSummary relayBatchSize;
 	private final Timer relayBatchDuration;
+	private final Map<String, Map<DuplicateStage, Counter>> duplicateSkipped = new HashMap<>();
 
 	private Map<OrderStatus, Long> orderStatusCounts = Map.of();
 	private long orderStatusCountedAtNanos;
@@ -96,6 +99,18 @@ public class SagaMetrics {
 				.minimumExpectedValue(Duration.ofMillis(1))
 				.maximumExpectedValue(Duration.ofSeconds(10))
 				.register(registry);
+
+		for (String consumer : SagaTopology.CONSUMER_QUEUES) {
+			Map<DuplicateStage, Counter> byStage = new EnumMap<>(DuplicateStage.class);
+			for (DuplicateStage stage : DuplicateStage.values()) {
+				byStage.put(stage, Counter.builder("mega.idempotency.duplicate.skipped")
+						.description("멱등 컨슈머가 이미 처리된 이벤트라 업무를 건너뛴 수 (재전송·재배달이 실제로 걸러진 횟수)")
+						.tag("consumer", consumer)
+						.tag("stage", stage.tagValue())
+						.register(registry));
+			}
+			duplicateSkipped.put(consumer, byStage);
+		}
 	}
 
 	/** 주문이 실제로 COMPLETED로 바뀌었을 때(complete()가 true) 같은 트랜잭션 안에서 호출한다. */
@@ -132,6 +147,15 @@ public class SagaMetrics {
 	/** 브로커는 받았지만(ack) 어떤 큐에도 라우팅되지 않아 되돌아온 경우 (mandatory return) */
 	public void relayReturned() {
 		relayReturned.increment();
+	}
+
+	/** 처리 트랜잭션이 롤백된 뒤(DuplicateEventGuard)에 호출하므로 커밋 여부를 따로 기다리지 않는다 */
+	public void duplicateSkipped(String consumer, DuplicateStage stage) {
+		Map<DuplicateStage, Counter> byStage = duplicateSkipped.get(consumer);
+		if (byStage == null) {
+			throw new IllegalArgumentException("등록되지 않은 컨슈머입니다: " + consumer);
+		}
+		byStage.get(stage).increment();
 	}
 
 	private void afterCommit(Runnable action) {

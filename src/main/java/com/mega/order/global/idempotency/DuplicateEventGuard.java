@@ -1,5 +1,8 @@
 package com.mega.order.global.idempotency;
 
+import com.mega.order.global.monitoring.DuplicateStage;
+import com.mega.order.global.monitoring.SagaMetrics;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,22 +16,31 @@ import org.springframework.stereotype.Component;
  * - DuplicateEventException: 처리 기록 조회에서 이미 있다고 확인된 경우 (재전송 등 대부분의 중복)
  * - processed_events의 unique 위반: 같은 이벤트가 동시에 들어와 조회를 둘 다 통과한 경우
  * 다른 제약 위반은 데이터 이상일 수 있으므로 그대로 던져 기존 재시도 정책(재시도 후 DLQ)을 따르게 한다.
+ * 건너뛴 횟수는 걸린 단계별로 지표에 남긴다 (중복 방지 장치가 실제로 작동했는지 확인용).
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class DuplicateEventGuard {
+
+	private final SagaMetrics sagaMetrics;
 
 	public void run(String consumer, String eventId, Runnable handler) {
 		try {
 			handler.run();
 		} catch (DuplicateEventException e) {
-			log.info("이미 처리된 이벤트라 건너뜁니다. consumer={}, eventId={}", consumer, eventId);
+			skipped(consumer, eventId, DuplicateStage.LOOKUP);
 		} catch (DataIntegrityViolationException e) {
 			if (!isProcessedEventDuplicate(e)) {
 				throw e;
 			}
-			log.info("이미 처리된 이벤트라 건너뜁니다. consumer={}, eventId={}", consumer, eventId);
+			skipped(consumer, eventId, DuplicateStage.UNIQUE);
 		}
+	}
+
+	private void skipped(String consumer, String eventId, DuplicateStage stage) {
+		log.info("이미 처리된 이벤트라 건너뜁니다. consumer={}, eventId={}, stage={}", consumer, eventId, stage.tagValue());
+		sagaMetrics.duplicateSkipped(consumer, stage);
 	}
 
 	// MySQL은 제약 이름을 "processed_events.uk_processed_consumer_event"처럼 테이블 이름을 붙여 알려준다
